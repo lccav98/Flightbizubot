@@ -1,0 +1,14 @@
+version: "3.8"
+
+services:
+  flightbizubot:
+    build: .
+    container_name: flightbizubot
+    restart: always
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DB_PATH=/app/data/radar_viagens.db

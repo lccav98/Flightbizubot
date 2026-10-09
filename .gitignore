@@ -1,0 +1,35 @@
+# Ambientes virtuais e dependências locais
+.venv/
+venv/
+ENV/
+env/
+
+# Arquivos de ambiente e credenciais sensíveis (NUNCA commitar tokens!)
+.env
+.env.local
+.env.*.local
+
+# Banco de dados SQLite local
+*.db
+*.db-journal
+*.sqlite3
+
+# Logs de execução
+*.log
+radar.log
+radar_err.log
+
+# Bytecode e caches do Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+
+# Configurações de IDEs e editores
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+.DS_Store
+Thumbs.db
