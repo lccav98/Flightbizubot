@@ -7,6 +7,8 @@ import re
 from dataclasses import dataclass
 from typing import List, Optional
 import feedparser
+from curl_cffi import requests as curl_requests
+import logging
 import database
 
 FEEDS = [
@@ -44,7 +46,12 @@ def scan_promotions() -> List[PromoItem]:
     
     for source_name, feed_url in FEEDS:
         try:
-            feed = feedparser.parse(feed_url)
+            # Passing a URL directly to feedparser has no bounded HTTP timeout.
+            # One stalled feed must not prevent all flight scans indefinitely.
+            with curl_requests.Session(timeout=15.0, allow_redirects=True, verify=True) as client:
+                response = client.get(feed_url)
+                response.raise_for_status()
+                feed = feedparser.parse(response.content)
             for entry in feed.entries:
                 title = getattr(entry, "title", "")
                 link = getattr(entry, "link", "")
@@ -78,7 +85,8 @@ def scan_promotions() -> List[PromoItem]:
                             published_at=published,
                             relevant_keyword=matched_kw
                         ))
-        except Exception:
+        except Exception as error:
+            logging.getLogger(__name__).warning("Feed %s indisponível: %s", source_name, type(error).__name__)
             continue
             
     return new_promos

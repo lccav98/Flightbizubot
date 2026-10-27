@@ -1,6 +1,6 @@
 @echo off
 chcp 65001 > nul
 echo Encerrando instâncias em segundo plano do Radar de Viagens...
-powershell -Command "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*main.py*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0stop_background.ps1"
 echo Concluído! O agente foi finalizado.
 pause
