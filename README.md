@@ -132,6 +132,24 @@ Flightbizubot/
 - **NUNCA** faça commit do seu arquivo `.env` nem exponha o seu `TELEGRAM_BOT_TOKEN`. O arquivo `.gitignore` deste projeto já está configurado para evitar vazamentos acidentais.
 - O banco de dados SQLite armazena apenas dados públicos de tarifas e os `chat_id` dos usuários que deram `/start` no bot para receber alertas.
 
+## Governança JEV e validação
+
+O trabalho de agentes neste projeto segue [AGENTS.md](AGENTS.md), com as
+nove ferramentas JEV quando o MCP estiver conectado no Codex ou Claude Code.
+Configuração do host, limites e critérios de aceite estão em
+[docs/JEV.md](docs/JEV.md). O bot não depende do JEV para operar.
+
+Para validar offline com Python 3.11+, sem instalar dependências ou configurar
+tokens:
+
+```sh
+python -W error scripts/validate.py
+```
+
+A checagem compila as fontes sem iniciar o bot e executa testes SQLite com
+dados temporários. A mesma validação roda no GitHub Actions. Ela não comprova
+integrações externas nem operação 24/7.
+
 ---
 
 ## 📄 Licença
