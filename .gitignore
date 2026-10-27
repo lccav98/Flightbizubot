@@ -36,3 +36,5 @@ Thumbs.db
 
 # Estado e métricas locais da governança JEV (podem conter contexto privado)
 .jev/
+.radar.lock
+.radar-stop

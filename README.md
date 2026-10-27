@@ -103,6 +103,21 @@ Se preferir rodar no seu próprio computador Windows:
    - Para parar quando quiser: execute `stop_background.bat`.
    - Para iniciar automaticamente ao ligar o Windows: execute `install_startup.bat`.
 
+   O launcher usa `supervise.ps1`: mantém uma instância por pasta e reinicia
+   o processo após 15 segundos caso ele encerre. Consulte `supervisor.log`,
+   `radar.log` e `radar_err.log` para diagnóstico. Use `stop_background.bat`
+   para parar tanto o bot quanto o ciclo de reinício. O computador precisa
+   permanecer ligado e conectado; o supervisor não evita suspensão do Windows.
+
+   Se não houver atualizações, envie `/status` no Telegram. `/buscar` inicia
+   uma busca e devolve o relatório quando ela termina. Os alertas automáticos
+   continuam condicionados a ofertas ou promoções novas.
+
+   As conexões Telegram usam `curl_cffi` com validação TLS habilitada para
+   compatibilidade com o Windows. Erros de formatação não desativam mais o
+   assinante; relatórios longos são divididos em mensagens. Feeds RSS têm
+   timeout para não bloquear indefinidamente a varredura de voos.
+
 ---
 
 ## 🛠️ Arquitetura do Projeto

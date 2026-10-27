@@ -5,8 +5,9 @@ from __future__ import annotations
 
 import html
 import asyncio
+import re
 from typing import List, Dict, Any, Optional
-import httpx
+from curl_cffi import requests as curl_requests
 from rich.console import Console
 
 from config import settings
@@ -34,6 +35,14 @@ class TelegramNotifier:
             console.log(f"[yellow][TELEGRAM NÃO CONFIGURADO][/yellow] Mensagem simulada para {chat_id}:\n{text[:200]}...")
             return False
 
+        # Telegram limits messages to 4096 characters after entity parsing.
+        # Long reports use plain text chunks so HTML tags are never cut in half.
+        if len(text) > 4000:
+            plain = html.unescape(re.sub(r"<[^>]+>", "", text)) if parse_mode == "HTML" else text
+            return all([self.send_to_chat(chat_id, plain[i:i + 4000], parse_mode="",
+                                         disable_web_page_preview=disable_web_page_preview)
+                        for i in range(0, len(plain), 4000)])
+
         url = f"{self.base_url}/sendMessage"
         payload = {
             "chat_id": chat_id,
@@ -41,22 +50,33 @@ class TelegramNotifier:
             "parse_mode": parse_mode,
             "disable_web_page_preview": disable_web_page_preview,
         }
+        if not parse_mode:
+            payload.pop("parse_mode")
 
         try:
-            with httpx.Client(timeout=15.0) as client:
+            with curl_requests.Session(timeout=15.0, verify=True) as client:
                 res = client.post(url, json=payload)
                 if res.status_code == 200:
                     return True
-                elif res.status_code in (403, 400):
-                    # Usuário bloqueou o bot ou chat inválido
+                elif res.status_code == 400:
+                    description = res.json().get("description", "").lower()
+                    if parse_mode == "HTML" and ("parse entities" in description or "message is too long" in description):
+                        plain = html.unescape(re.sub(r"<[^>]+>", "", text))
+                        return self.send_to_chat(chat_id, plain, parse_mode="",
+                                                 disable_web_page_preview=disable_web_page_preview)
+                    if "chat not found" in description or "user is deactivated" in description:
+                        database.set_subscriber_status(chat_id, False)
+                    console.log("[red]Telegram rejeitou a mensagem (HTTP 400).[/red]")
+                    return False
+                elif res.status_code == 403:
                     console.log(f"[yellow]Usuário {chat_id} desativado (status {res.status_code}).[/yellow]")
                     database.set_subscriber_status(chat_id, False)
                     return False
                 else:
-                    console.log(f"[red]Erro Telegram ({chat_id}):[/red] {res.status_code} - {res.text}")
+                    console.log(f"[red]Erro Telegram: HTTP {res.status_code}.[/red]")
                     return False
         except Exception as e:
-            console.log(f"[red]Exceção no envio para {chat_id}:[/red] {e}")
+            console.log(f"[red]Falha de envio Telegram: {type(e).__name__}.[/red]")
             return False
 
     def broadcast(self, text: str, parse_mode: str = "HTML", disable_web_page_preview: bool = False) -> int:
@@ -130,10 +150,10 @@ class TelegramNotifier:
         """Envia alerta de promoção relâmpago para todos os inscritos."""
         msg = (
             f"🔥 <b>PROMOÇÃO / NOTÍCIA RELÂMPAGO!</b>\n"
-            f"📢 <b>Fonte:</b> {promo.source}\n"
-            f"🏷️ <b>Título:</b> {promo.title}\n\n"
-            f"📝 {promo.snippet}\n\n"
-            f"🔗 <a href='{promo.link}'>Acessar Promoção Completa</a>"
+            f"📢 <b>Fonte:</b> {html.escape(promo.source)}\n"
+            f"🏷️ <b>Título:</b> {html.escape(promo.title)}\n\n"
+            f"📝 {html.escape(promo.snippet)}\n\n"
+            f"🔗 <a href='{html.escape(promo.link, quote=True)}'>Acessar Promoção Completa</a>"
         )
         return self.broadcast(msg) > 0
 
@@ -170,13 +190,17 @@ class TelegramNotifier:
         if not self.is_configured:
             return
 
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        connected = False
+        async with curl_requests.AsyncSession(timeout=30.0, verify=True) as client:
             while True:
                 try:
                     url = f"{self.base_url}/getUpdates"
                     params = {"offset": self.last_update_id + 1, "timeout": 20}
                     response = await client.get(url, params=params)
                     if response.status_code == 200:
+                        if not connected:
+                            console.log("[green]Telegram conectado; escuta de comandos ativa.[/green]")
+                            connected = True
                         data = response.json()
                         for update in data.get("result", []):
                             self.last_update_id = update["update_id"]
@@ -192,9 +216,14 @@ class TelegramNotifier:
                                 first_name = user_info.get("first_name", "")
                                 database.register_or_update_subscriber(chat_id, username, first_name)
 
-                                console.log(f"[cyan]Mensagem de {first_name or username} ({chat_id}):[/cyan] {text}")
                                 await on_command_callback(self, text, chat_id, user_info)
+                    else:
+                        connected = False
+                        console.log(f"[red]Polling Telegram: HTTP {response.status_code}; nova tentativa em 5s.[/red]")
+                        await asyncio.sleep(5)
                 except Exception as e:
+                    connected = False
+                    console.log(f"[red]Falha no polling/comando Telegram: {type(e).__name__}; nova tentativa em 5s.[/red]")
                     await asyncio.sleep(5)
                 await asyncio.sleep(1)
 
