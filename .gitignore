@@ -33,3 +33,6 @@ __pycache__/
 *.sublime-workspace
 .DS_Store
 Thumbs.db
+
+# Estado e métricas locais da governança JEV (podem conter contexto privado)
+.jev/
